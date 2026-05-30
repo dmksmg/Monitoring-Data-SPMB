@@ -384,7 +384,7 @@ function App() {
             </div>
             <div>
               <h1 className="text-lg font-bold text-slate-900 leading-tight">
-                Monitoring Data
+                Monitoring Data SPMB
               </h1>
               <p className="text-xs font-medium text-indigo-600">{user.branch}</p>
             </div>
@@ -401,7 +401,7 @@ function App() {
                 "w-1.5 h-1.5 rounded-full",
                 isAppScriptConfigured() ? "bg-green-500" : "bg-amber-500"
               )}></div>
-              {isAppScriptConfigured() ? 'Apps Script: Connected' : 'Mode: Local Only'}
+              {isAppScriptConfigured() ? 'Database: Connected' : 'Mode: Local Only'}
             </div>
           </div>
           <button 
@@ -822,7 +822,7 @@ function App() {
       )}
 
       <footer className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center text-slate-400 text-xs">
-        <p>© 2024 Dashboard Monitoring Siswa. Terintegrasi dengan Google Sheets & Apps Script.</p>
+        <p>© 2024 Dashboard Monitoring Siswa. Terintegrasi dengan databse.</p>
       </footer>
     </div>
   );
