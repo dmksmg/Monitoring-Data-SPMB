@@ -15,7 +15,7 @@ const SHEET_ID = '1ASHtHbSeGP0NLuaFPKf_cN6ccsddyOCkvwsGy4Ns3pA';
 export async function fetchSpreadsheetData(): Promise<SpreadsheetRow[]> {
   if (USE_APPSCRIPT) {
     try {
-      const response = await fetch(`${APPS_SCRIPT_URL}?action=data_masuk`);
+      const response = await fetch(`${APPS_SCRIPT_URL}?action=data_masuk&t=${Date.now()}`);
       const objects = await response.json();
       return parseDataMasukObjects(objects);
     } catch (error) {
@@ -29,7 +29,7 @@ export async function fetchSpreadsheetData(): Promise<SpreadsheetRow[]> {
  * Parse response dari Apps Script (array of objects dengan nama header sebagai key)
  */
 function parseDataMasukObjects(objects: any[]): SpreadsheetRow[] {
-  return objects.map((obj: any) => {
+  return objects.map((obj: any, i: number) => {
     const get = (...keys: string[]) => {
       for (const key of keys) {
         const found = Object.keys(obj).find(k => k.toLowerCase().replace(/\s+/g, '').includes(key.toLowerCase().replace(/\s+/g, '')));
@@ -41,6 +41,7 @@ function parseDataMasukObjects(objects: any[]): SpreadsheetRow[] {
     };
 
     return {
+      rowId: String(obj.rowId || (i + 2)),
       timestamp: get('Timestamp'),
       namaSiswa: get('Nama Siswa'),
       asalSekolah: get('Asal Sekolah'),
@@ -72,11 +73,12 @@ async function fetchViaGviz(): Promise<SpreadsheetRow[]> {
     const jsonData = JSON.parse(text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1));
     const rows = jsonData.table.rows;
     
-    return rows.map((row: any) => {
+    return rows.map((row: any, i: number) => {
       const getVal = (idx: number) => (idx < 0 || !row.c[idx]) ? '' : (row.c[idx].v ?? '');
       const getFormattedVal = (idx: number) => (idx < 0 || !row.c[idx]) ? '' : (row.c[idx].f ?? row.c[idx].v ?? '');
 
       return {
+        rowId: String(i + 2),
         timestamp: getFormattedVal(0),
         namaSiswa: String(getVal(1) || ''),
         asalSekolah: String(getVal(2) || ''),
@@ -106,7 +108,7 @@ async function fetchViaGviz(): Promise<SpreadsheetRow[]> {
 export async function fetchKonsultanOptions(): Promise<string[]> {
   if (USE_APPSCRIPT) {
     try {
-      const response = await fetch(`${APPS_SCRIPT_URL}?action=validasi`);
+      const response = await fetch(`${APPS_SCRIPT_URL}?action=validasi&t=${Date.now()}`);
       const data = await response.json();
       // Jika Apps Script punya field tempat yang bisa di-reuse, atau fallback
       if (Array.isArray(data.konsultan)) return data.konsultan;
@@ -137,6 +139,7 @@ export async function fetchKonsultanOptions(): Promise<string[]> {
 export async function saveConfirmation(payload: {
   timestamp: string;
   namaSiswa: string;
+  rowId?: string;
   tanggalKonsultasi: string;
   waktuKonsultasi: string;
   konsultan: string;
@@ -147,15 +150,19 @@ export async function saveConfirmation(payload: {
   }
 
   try {
-    await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      body: JSON.stringify({
-        action: 'update',
-        ...payload
-      }),
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' }
-    });
+    // Use GET with query params to avoid CORS preflight issues in some environments.
+    const params = new URLSearchParams({ action: 'update' });
+    if (payload.rowId) params.set('rowId', payload.rowId);
+    if (payload.timestamp) params.set('timestamp', payload.timestamp);
+    if (payload.namaSiswa) params.set('namaSiswa', payload.namaSiswa);
+    if (payload.tanggalKonsultasi) params.set('tanggalKonsultasi', payload.tanggalKonsultasi);
+    if (payload.waktuKonsultasi) params.set('waktuKonsultasi', payload.waktuKonsultasi);
+    if (payload.konsultan) params.set('konsultan', payload.konsultan);
+    if (payload.status) params.set('status', payload.status);
+    params.set('t', String(Date.now()));
+
+    const url = `${APPS_SCRIPT_URL}?${params.toString()}`;
+    await fetch(url, { method: 'GET', mode: 'no-cors' });
     return { success: true, message: '✓ Data berhasil disimpan ke Spreadsheet' };
   } catch (err) {
     console.error('Gagal menyimpan:', err);

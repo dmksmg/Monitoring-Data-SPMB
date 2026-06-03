@@ -14,4 +14,5 @@ export interface SpreadsheetRow {
   waktuKonsultasi: string;
   konsultan: string;
   status: string;
+  rowId: string;
 }

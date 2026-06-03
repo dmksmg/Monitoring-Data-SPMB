@@ -115,6 +115,7 @@ function App() {
   };
 
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [serverRow, setServerRow] = useState<SpreadsheetRow | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToast({ message, type });
@@ -133,6 +134,7 @@ function App() {
     const payload = {
       timestamp: selectedItem.timestamp,
       namaSiswa: selectedItem.namaSiswa,
+      rowId: selectedItem.rowId,
       tanggalKonsultasi: tanggalFormatted,
       waktuKonsultasi: editForm.waktuKonsultasi,
       konsultan: editForm.konsultan,
@@ -141,7 +143,7 @@ function App() {
 
     // Update lokal dulu agar UI langsung merespons
     const updatedData = data.map(item => {
-      if (item.timestamp === selectedItem.timestamp && item.namaSiswa === selectedItem.namaSiswa) {
+      if (selectedItem.rowId && item.rowId === selectedItem.rowId) {
         return { 
           ...item, 
           tanggalKonsultasi: tanggalFormatted, 
@@ -162,6 +164,18 @@ function App() {
       showToast(result.message, 'success');
     } else {
       showToast(result.message, 'info');
+    }
+  };
+
+  const checkServerData = async () => {
+    if (!selectedItem) return;
+    try {
+      const all = await fetchSpreadsheetData();
+      const found = all.find(r => (r.rowId && selectedItem.rowId && r.rowId === selectedItem.rowId) || (r.namaSiswa === selectedItem.namaSiswa));
+      setServerRow(found || null);
+      if (!found) showToast('Baris tidak ditemukan di server response', 'info');
+    } catch (e) {
+      showToast('Gagal mengambil data server', 'error');
     }
   };
 
@@ -527,7 +541,7 @@ function App() {
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {filteredDataForUser.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50/30 transition-all group">
+                    <tr key={item.rowId || idx} className="hover:bg-slate-50/30 transition-all group">
                       <td className="px-8 py-6 align-top">
                         <button 
                           onClick={() => {setSelectedItem(item); setIsEditing(false);}}
@@ -659,6 +673,10 @@ function App() {
                 <div>
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Edit Konsultasi</label>
                   <div className="mt-3 space-y-4">
+                    <div className="flex items-end justify-between mb-2">
+                      <div />
+                      <button onClick={checkServerData} className="px-3 py-1 text-xs bg-indigo-50 text-indigo-600 rounded-lg">Check Server Data</button>
+                    </div>
                     {isEditing ? (
                       <div className="space-y-4">
                         <div>
@@ -731,6 +749,14 @@ function App() {
                         <DetailItem icon={<Calendar />} label="Tanggal Konsultasi" value={formatDateDisplay(selectedItem.tanggalKonsultasi)} />
                         <DetailItem icon={<Clock />} label="Waktu Konsultasi" value={selectedItem.waktuKonsultasi} />
                         <DetailItem icon={<User />} label="Konsultan" value={selectedItem.konsultan} />
+                      </div>
+                    )}
+                    {serverRow && (
+                      <div className="mt-4 p-3 bg-slate-50 border border-slate-100 rounded-lg text-sm">
+                        <div className="font-semibold mb-1">Server Data (raw)</div>
+                        <div>Tanggal server: {formatDateDisplay(serverRow.tanggalKonsultasi)}</div>
+                        <div>Waktu server: {serverRow.waktuKonsultasi || '-'}</div>
+                        <div>Konsultan server: {serverRow.konsultan || '-'}</div>
                       </div>
                     )}
                     <DetailItem icon={<MapPin />} label="Tempat" value={selectedItem.tempatKonsultasi} />

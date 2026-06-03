@@ -1,11 +1,3 @@
-# Panduan Integrasi Google Apps Script
-
-## 🎯 Tujuan
-Menghubungkan Dashboard Monitoring dengan Google Sheets agar data yang diedit di web bisa tersimpan secara **permanen** ke spreadsheet.
-
----
-
-## 📋 Langkah-langkah Setup
 
 ### 1. Buka Google Apps Script Editor
 1. Buka spreadsheet Anda: `https://docs.google.com/spreadsheets/d/1ASHtHbSeGP0NLuaFPKf_cN6ccsddyOCkvwsGy4Ns3pA/`
