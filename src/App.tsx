@@ -406,6 +406,49 @@ function App() {
     return ['All', ...statuses];
   }, [processedDataForUser]);
 
+  // Compute unique konsultan count with normalization (trim, lower, remove non-alnum)
+  const uniqueKonsultanCount = useMemo(() => {
+    const norm = (s: string) => s.toString().trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    const set = new Set<string>();
+    for (const r of processedDataForUser) {
+      if (r.konsultan && r.konsultan.toString().trim() !== '') {
+        set.add(norm(r.konsultan));
+      }
+    }
+    return set.size;
+  }, [processedDataForUser]);
+
+  // Compute unique konsultan active for today's date in Asia/Jakarta
+  const uniqueKonsultanActiveToday = useMemo(() => {
+    const norm = (s: string) => s.toString().trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    // get current date in Asia/Jakarta
+    const now = new Date();
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const jakarta = new Date(utc + 7 * 3600000);
+    const jy = jakarta.getFullYear();
+    const jm = String(jakarta.getMonth() + 1).padStart(2, '0');
+    const jd = String(jakarta.getDate()).padStart(2, '0');
+    const todayStr = `${jd}/${jm}/${jy}`; // dd/MM/yyyy
+
+    const set = new Set<string>();
+    for (const r of processedDataForUser) {
+      const t = r.tanggalKonsultasi || '';
+      // extract dd/MM/yyyy at start of string
+      const m = ('' + t).match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+      if (m) {
+        const d = m[1].padStart(2, '0');
+        const mo = m[2].padStart(2, '0');
+        const y = m[3];
+        const rowDate = `${d}/${mo}/${y}`;
+        if (rowDate === todayStr && r.konsultan && r.konsultan.toString().trim() !== '') {
+          set.add(norm(r.konsultan));
+        }
+      }
+    }
+    return set.size;
+  }, [processedDataForUser]);
+
   if (!user) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
@@ -541,7 +584,7 @@ function App() {
           />
           <StatCard 
             title="Konsultan Aktif" 
-            value={new Set(processedDataForUser.map(d => d.konsultan).filter(k => k && k.trim() !== '')).size} 
+            value={uniqueKonsultanActiveToday} 
             icon={<User className="w-6 h-6" />} 
             color="violet" 
           />
