@@ -187,6 +187,21 @@ function doUpdate(payload) {
 
   var rowIndex = -1;
 
+  // Ensure there is a 'Last Updated' column; if not, add it to prevent client fallback
+  var updatedIdx = getHeaderIndex(headers, 'Last Updated');
+  if (updatedIdx === -1) {
+    updatedIdx = getHeaderIndex(headers, 'Updated At');
+  }
+  if (updatedIdx === -1) {
+    // Add a new header column at the end
+    var lastCol = headers.length;
+    sheet.getRange(1, lastCol + 1).setValue('Last Updated');
+    headers.push('Last Updated');
+    updatedIdx = headers.length - 1;
+    // refresh rows variable so subsequent getHeaderIndex calls are consistent
+    rows = sheet.getDataRange().getValues();
+  }
+
   // Jika client mengirim rowId (nomor baris sheet), gunakan langsung
   if (payload.rowId) {
     var parsed = parseInt(payload.rowId, 10);
@@ -255,7 +270,17 @@ function doUpdate(payload) {
 
   Logger.log('doUpdate: completed update for row %s', rowIndex);
 
-  return jsonResponse({ status: 'success', action: 'update', row: rowIndex });
+  // Set a server-side last-updated timestamp if the sheet has a matching column
+  // support multiple possible header names for backward compatibility
+  if (updatedIdx === -1) updatedIdx = getHeaderIndex(headers, 'Terakhir Update');
+  if (updatedIdx === -1) updatedIdx = getHeaderIndex(headers, 'Diupdate');
+  var nowFormatted = Utilities.formatDate(new Date(), 'Asia/Jakarta', "dd/MM/yyyy HH:mm 'WIB'");
+  if (updatedIdx >= 0) {
+    Logger.log('doUpdate: setting last-updated for row %s -> %s', rowIndex, nowFormatted);
+    sheet.getRange(rowIndex, updatedIdx + 1).setValue(nowFormatted);
+  }
+
+  return jsonResponse({ status: 'success', action: 'update', row: rowIndex, lastUpdated: nowFormatted });
 }
 
 function jsonResponse(obj) {

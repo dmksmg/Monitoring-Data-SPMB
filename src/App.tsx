@@ -81,6 +81,14 @@ function App() {
     loadData();
   }, [refreshKey]);
 
+  // Auto-polling setiap 5 menit untuk mengambil data terbaru dari server
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setRefreshKey(prev => prev + 1);
+    }, 5 * 60 * 1000); // 5 menit
+    return () => clearInterval(interval);
+  }, []);
+
 
 
   const handleRefresh = () => setRefreshKey(prev => prev + 1);
@@ -162,6 +170,8 @@ function App() {
     const result = await saveConfirmation(payload);
     if (result.success) {
       showToast(result.message, 'success');
+      // Pastikan ambil ulang data terbaru dari server setelah update
+      setRefreshKey(prev => prev + 1);
     } else {
       showToast(result.message, 'info');
     }
@@ -321,6 +331,76 @@ function App() {
     return { total, byStatus };
   }, [processedDataForUser]);
 
+  // Compute latest update time from server-side `lastUpdated` if present,
+  // otherwise fall back to the registration `timestamp` or schedule date.
+  const latestServerUpdate = useMemo(() => {
+    const candidates = processedDataForUser.map(r => r.lastUpdated || r.tanggalKonsultasi || r.timestamp).filter(Boolean);
+    if (candidates.length === 0) return '';
+
+    // Parse various formats and find the most recent Date
+    const parseToDate = (s: string) => {
+      if (!s) return null;
+      // Apps Script format: 'dd/MM/yyyy HH:mm WIB' or 'dd/MM/yyyy HH:mm 'WIB''
+      const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/);
+      if (m) {
+        const dd = parseInt(m[1], 10);
+        const mm = parseInt(m[2], 10) - 1;
+        const yy = parseInt(m[3], 10);
+        const hh = m[4] ? parseInt(m[4], 10) : 0;
+        const mi = m[5] ? parseInt(m[5], 10) : 0;
+        return new Date(yy, mm, dd, hh, mi);
+      }
+      // ISO-like or YYYY-MM-DD
+      const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (iso) {
+        return new Date(s);
+      }
+      // fallback try Date parse
+      const d = new Date(s);
+      if (!isNaN(d.getTime())) return d;
+      return null;
+    };
+
+    let max = 0;
+    let best = '';
+    for (const c of candidates) {
+      const d = parseToDate(c);
+      if (d && d.getTime() > max) {
+        max = d.getTime();
+        best = c;
+      }
+    }
+    return best;
+  }, [processedDataForUser]);
+
+  const formatDateTimeDisplay = (dateStr: string) => {
+    if (!dateStr) return '-';
+    // If already in dd/MM/yyyy HH:mm WIB
+    const m = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/);
+    if (m) {
+      const d = m[1].padStart(2, '0');
+      const mo = m[2].padStart(2, '0');
+      const y = m[3];
+      const hh = m[4] ? m[4].padStart(2, '0') : '';
+      const mi = m[5] ? m[5].padStart(2, '0') : '';
+      return hh ? `${d}-${mo}-${y} ${hh}:${mi}` : `${d}-${mo}-${y}`;
+    }
+    // ISO-like fallback
+    const iso = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) {
+      const dt = new Date(dateStr);
+      if (!isNaN(dt.getTime())) {
+        const d = String(dt.getDate()).padStart(2, '0');
+        const mo = String(dt.getMonth() + 1).padStart(2, '0');
+        const y = dt.getFullYear();
+        const hh = String(dt.getHours()).padStart(2, '0');
+        const mi = String(dt.getMinutes()).padStart(2, '0');
+        return `${d}-${mo}-${y} ${hh}:${mi}`;
+      }
+    }
+    return dateStr;
+  };
+
   const statusOptionsForUser = useMemo(() => {
     const statuses = Array.from(new Set(processedDataForUser.map(item => item.status))).filter(Boolean);
     return ['All', ...statuses];
@@ -454,7 +534,7 @@ function App() {
           />
           <StatCard 
             title="Update Terbaru" 
-            value={processedDataForUser.length > 0 ? formatDateDisplay(processedDataForUser[0].timestamp.split(',')[0]) : '-'} 
+            value={processedDataForUser.length > 0 ? formatDateTimeDisplay(latestServerUpdate || processedDataForUser[0].timestamp.split(',')[0]) : '-'} 
             icon={<Calendar className="w-6 h-6" />} 
             color="amber" 
             isText

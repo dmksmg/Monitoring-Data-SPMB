@@ -56,6 +56,8 @@ function parseDataMasukObjects(objects: any[]): SpreadsheetRow[] {
       waktuKonsultasi: get('Waktu Konsultasi'),
       konsultan: get('Konsultan'),
       status: get('Status') || (get('Tanggal Konsultasi') && get('Waktu Konsultasi') && get('Konsultan') ? 'Terkonfirmasi' : 'Belum Dikonfirmasi'),
+      // Optional server-side last updated timestamp (if sheet has such column)
+      lastUpdated: get('Last Updated', 'Updated At', 'Terakhir Update', 'Diupdate', 'Updated')
     };
   });
 }
@@ -162,8 +164,23 @@ export async function saveConfirmation(payload: {
     params.set('t', String(Date.now()));
 
     const url = `${APPS_SCRIPT_URL}?${params.toString()}`;
-    await fetch(url, { method: 'GET', mode: 'no-cors' });
-    return { success: true, message: '✓ Data berhasil disimpan ke Spreadsheet' };
+    const res = await fetch(url, { method: 'GET' });
+    // Try to parse JSON response from Apps Script
+    try {
+      const json = await res.json();
+      if (json && (json.status === 'success' || json.ok === true)) {
+        return { success: true, message: '✓ Data berhasil disimpan ke Spreadsheet' };
+      }
+      // If apps script returned lastUpdated, consider success
+      if (json && json.action === 'update' && json.row) {
+        return { success: true, message: '✓ Data berhasil disimpan ke Spreadsheet' };
+      }
+      return { success: false, message: (json && json.error) ? String(json.error) : 'Gagal menulis ke server' };
+    } catch (e) {
+      // Could not parse JSON (CORS/opaque response). Fall back to optimistic success.
+      console.warn('saveConfirmation: non-json response, falling back to optimistic success', e);
+      return { success: true, message: '✓ Data (optimistic) disimpan (no-json response)' };
+    }
   } catch (err) {
     console.error('Gagal menyimpan:', err);
     return { success: false, message: 'Gagal menyimpan ke Spreadsheet' };

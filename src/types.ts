@@ -15,4 +15,5 @@ export interface SpreadsheetRow {
   konsultan: string;
   status: string;
   rowId: string;
+  lastUpdated?: string;
 }
